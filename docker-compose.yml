@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  # 1. BACKEND SERVİSİ (FastAPI)
+  backend:
+    build:
+      context: .
+      dockerfile: app/backend/Dockerfile
+    container_name: pet_backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models:/app/models              # Modelleri içeri aktar (Canlı erişim)
+      - ./app/backend/gallery:/app/app/backend/gallery # Galeri resimlerini kalıcı yap
+      - ./app/backend:/app/app/backend 
+    environment:
+      - CUDA_VISIBLE_DEVICES=-1           # CPU modunda çalıştır
+    networks:
+      - pet_network
+
+  # 2. FRONTEND SERVİSİ (Streamlit)
+  frontend:
+    build:
+      context: .
+      dockerfile: app/frontend/Dockerfile
+    container_name: pet_frontend
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./app/frontend:/app/app/frontend
+    environment:
+      # Docker içinde backend'e 'localhost' diyemeyiz, servis adını (backend) kullanırız
+      - API_URL=http://backend:8000
+    depends_on:
+      - backend                           # Backend açılmadan Frontend açılmasın
+    networks:
+      - pet_network
+
+  # 3. DEPOLAMA SERVİSİ (MinIO - İlerisi için)
+  minio:
+    image: minio/minio
+    container_name: pet_minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - pet_network
+
+networks:
+  pet_network:
+    driver: bridge
+
+volumes:
+  minio_data:

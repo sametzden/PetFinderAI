@@ -1,0 +1,10 @@
+tensorflow
+fastapi
+uvicorn
+python-multipart
+pillow
+numpy
+scikit-learn
+streamlit
+requests
+minio
