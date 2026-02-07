@@ -10,14 +10,19 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./models:/app/models              # Modelleri içeri aktar (Canlı erişim)
-      - ./app/backend/gallery:/app/app/backend/gallery # Galeri resimlerini kalıcı yap
-      - ./app/backend:/app/app/backend 
+      - ./models:/app/models
+      - ./app/backend/gallery:/app/app/backend/gallery
     environment:
-      - CUDA_VISIBLE_DEVICES=-1           # CPU modunda çalıştır
+      - CUDA_VISIBLE_DEVICES=-1
+      - PYTHONUNBUFFERED=1
     networks:
       - pet_network
-
+    # YENİ: Sadece "başlatma" değil, "sağlıklı olmasını bekle" diyoruz
+    depends_on:
+      qdrant:
+        condition: service_healthy
+      minio:
+        condition: service_started
   # 2. FRONTEND SERVİSİ (Streamlit)
   frontend:
     build:
@@ -48,6 +53,23 @@ services:
       - minio_data:/data
     networks:
       - pet_network
+
+  # 4. VEKTÖR VERİTABANI (Qdrant)
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: pet_qdrant
+    ports:
+      - "6333:6333"
+    volumes:
+      - ./qdrant_storage:/qdrant/storage
+    networks:
+      - pet_network
+    # YENİ: Qdrant'ın yaşayıp yaşamadığını kontrol eden mekanizma
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'cat < /dev/null > /dev/tcp/localhost/6333'"] 
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
 networks:
   pet_network:

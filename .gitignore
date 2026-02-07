@@ -1,26 +1,7 @@
-# Python gereksizleri
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Sanal Ortam 
 venv/
-env/
+__pycache__/
+*.pyc
 .env
-
-# Modeller 
-*.h5
-*.weights.h5
-models/
-
-# Galeri resimleri (Test için yüklediklerim)
-app/backend/gallery/*
-!app/backend/gallery/.gitkeep
-
-# IDE ayarları (VS Code vb.)
-.vscode/
-.idea/
-
-# İşletim sistemi dosyaları
 .DS_Store
-Thumbs.db
+qdrant_storage/
+minio_data/

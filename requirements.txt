@@ -8,3 +8,4 @@ scikit-learn
 streamlit
 requests
 minio
+qdrant-client==1.9.1
