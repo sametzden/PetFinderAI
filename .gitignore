@@ -5,3 +5,6 @@ __pycache__/
 .DS_Store
 qdrant_storage/
 minio_data/
+qdrant_storage/
+minio_data/
+__pycache__/

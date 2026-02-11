@@ -9,3 +9,6 @@ streamlit
 requests
 minio
 qdrant-client==1.9.1
+# Ultralytics'i CPU modunda kurmak için özel ayar:
+--extra-index-url https://download.pytorch.org/whl/cpu
+ultralytics
