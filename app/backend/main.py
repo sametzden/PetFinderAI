@@ -14,17 +14,16 @@ from ultralytics import YOLO
 
 # --- AYARLAR ---
 MODEL_PATH = "models/final_breed_model.weights.h5"
-MINIO_ENDPOINT = "minio:9000"
-MINIO_ACCESS_KEY = "minioadmin"
-MINIO_SECRET_KEY = "minioadmin"
-
+MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "minio:9000")
+MINIO_ACCESS_KEY = os.getenv("MINIO_ROOT_USER", "minioadmin")
+MINIO_SECRET_KEY = os.getenv("MINIO_ROOT_PASSWORD", "minioadmin")
 # İKİ AYRI KOVA (BUCKET)
-TEST_BUCKET = "pet-test"   # Modeli denemek isteyenler için
-ADS_BUCKET = "pet-ads"     # Gerçek ilanlar için
+TEST_BUCKET = os.getenv("MINIO_BUCKET_TEST", "pet-test")
+ADS_BUCKET = os.getenv("MINIO_BUCKET_ADS", "pet-ads")
 
-QDRANT_HOST = "qdrant"
-QDRANT_PORT = 6333
-COLLECTION_NAME = "pet_vectors"
+QDRANT_HOST = os.getenv("QDRANT_HOST", "qdrant")
+QDRANT_PORT = int(os.getenv("QDRANT_PORT", 6333))
+COLLECTION_NAME = os.getenv("QDRANT_COLLECTION", "pet_vectors")
 VECTOR_SIZE = 128
 NUM_CLASSES = 37
 
@@ -205,70 +204,7 @@ async def predict(
         "error": False,
         "debug_info": detected_label
     }
-    # 4. Benzerleri Ara (Değişmedi)
-    similar_pets = []
-    if qdrant_client:
-        try:
-            search_filter = None
-            
-            # 'real' modundaysak SADECE gerçek ilanları getir
-            if mode == "real":
-                search_filter = models.Filter(
-                    must=[models.FieldCondition(key="type", match=models.MatchValue(value="ad"))]
-                )
-            # 'test' modundaysak HEPSİNİ getir (Az önce kaydettiğimiz dahil!)
 
-            search_result = qdrant_client.search(
-                collection_name=COLLECTION_NAME,
-                query_vector=embedding_vector, # Şu anki vektörle ara
-                query_filter=search_filter,
-                limit=6 # Kendisi de çıkacağı için limiti 1 artırdık
-            )
-
-            for result in search_result:
-                payload = result.payload
-                filename = payload.get("filename")
-                bucket = payload.get("bucket", ADS_BUCKET)
-                
-                # Kendisini listede göstermeyelim (Opsiyonel, şimdilik kalsın görelim)
-                
-                score = result.score
-                sim_score = 1 / (1 + score) if score >= 0 else 0
-                
-                try:
-                    resp = minio_client.get_object(bucket, filename)
-                    b64_img = base64.b64encode(resp.read()).decode('utf-8')
-                    resp.close(); resp.release_conn()
-                    
-                    pet_data = {
-                        "filename": filename,
-                        "score": sim_score,
-                        "image_base64": b64_img,
-                        "status": payload.get("status", "Bilinmiyor"),
-                        "city": payload.get("city", "-"),
-                        "bucket": bucket
-                    }
-                    
-                    if mode == "real":
-                        pet_data["contact_info"] = payload.get("contact_info", "Belirtilmemiş")
-                        pet_data["owner_name"] = payload.get("owner_name", "Anonim")
-                        pet_data["description"] = payload.get("description", "")
-                    else:
-                        pet_data["contact_info"] = "🔒 (Sadece İlan Modunda)"
-                        pet_data["owner_name"] = "🔒 Gizli"
-                        pet_data["description"] = "Bu sonuç benzerlik testi için gösterilmektedir."
-
-                    similar_pets.append(pet_data)
-                except: pass
-        except Exception as e: print(f"Arama Hatası: {e}")
-
-    return {
-        "prediction": class_names[pred_idx],
-        "confidence": float(class_probs[0][pred_idx]),
-        "similar_pets": similar_pets,
-        "error": False,
-        "debug_info": detected_label
-    }
 
 @app.post("/upload_to_gallery")
 async def upload_to_gallery(

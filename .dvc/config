@@ -1,0 +1,7 @@
+[core]
+    remote = myminio
+['remote "myminio"']
+    url = s3://dvc-storage
+    endpointurl = http://localhost:9000
+    access_key_id = admin_samet
+    secret_access_key = Samet147

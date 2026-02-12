@@ -8,3 +8,4 @@ minio_data/
 qdrant_storage/
 minio_data/
 __pycache__/
+.env

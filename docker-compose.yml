@@ -1,17 +1,19 @@
 version: '3.8'
 
 services:
-  # 1. BACKEND SERVİSİ (FastAPI)
+  # 1. BACKEND SERVİSİ
   backend:
     build:
       context: .
       dockerfile: app/backend/Dockerfile
     container_name: pet_backend
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT}:8000"  # Portu .env'den alıyor
     volumes:
       - ./models:/app/models
       - ./app/backend/gallery:/app/app/backend/gallery
+    env_file:  # <---  Tüm .env değişkenlerini içeri aktarır
+      - .env
     environment:
       - CUDA_VISIBLE_DEVICES=-1
       - PYTHONUNBUFFERED=1
@@ -19,38 +21,39 @@ services:
       - pet_network
     depends_on:
       qdrant:
-        condition: service_healthy  # Qdrant'ın "hazırım" demesini bekler
+        condition: service_healthy
       minio:
-        condition: service_healthy  # MinIO'nun "hazırım" demesini bekler
+        condition: service_healthy
 
-  # 2. FRONTEND SERVİSİ (Streamlit)
+  # 2. FRONTEND SERVİSİ
   frontend:
     build:
       context: .
       dockerfile: app/frontend/Dockerfile
     container_name: pet_frontend
     ports:
-      - "8501:8501"
+      - "${FRONTEND_PORT}:8501"
     volumes:
       - ./app/frontend:/app/app/frontend
+    env_file:
+      - .env
     environment:
-      - API_URL=http://backend:8000
+      - API_URL=${API_URL}
     depends_on:
       - backend
     networks:
       - pet_network
 
-  # 3. VEKTÖR VERİTABANI (Qdrant)
+  # 3. QDRANT
   qdrant:
     image: qdrant/qdrant:latest
     container_name: pet_qdrant
     ports:
-      - "6333:6333"
+      - "${QDRANT_PORT}:6333"
     volumes:  
       - ./qdrant_storage:/qdrant/storage
     networks:
       - pet_network
-    
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'cat < /dev/null > /dev/tcp/localhost/6333'"]
       interval: 10s
@@ -58,22 +61,21 @@ services:
       retries: 5
       start_period: 5s
 
-  # 4. DOSYA DEPOLAMA (MinIO)
+  # 4. MINIO
   minio:
     image: minio/minio
     container_name: pet_minio
     ports:
       - "9000:9000"
       - "9001:9001"
-    environment:
-      - MINIO_ROOT_USER=minioadmin
-      - MINIO_ROOT_PASSWORD=minioadmin
+    env_file:
+      - .env
+    # MinIO, env dosyasındaki değişkenleri otomatik tanır
     command: server /data --console-address ":9001"
     volumes:  
       - ./minio_data:/data
     networks:
       - pet_network
-    # --- MINIO İÇİN DE SAĞLIK KONTROLÜ EKLEDİK ---
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 30s
@@ -86,4 +88,4 @@ networks:
 
 volumes:
   minio_data:
-  qdrant_storage: # Burayı da volumes altına ekledim ki hata vermesin
+  qdrant_storage:

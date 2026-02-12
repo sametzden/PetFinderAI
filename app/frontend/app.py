@@ -1,10 +1,10 @@
 import streamlit as st
 import requests
-
+import os
 st.set_page_config(page_title="PetFinder AI", page_icon="🐾", layout="wide")
 st.markdown("<style>.css-15zrgzn {display: none} .css-1629p8f h1 a {display: none} a.anchor-link {display: none}</style>", unsafe_allow_html=True)
 
-BASE_URL = "http://backend:8000"
+BASE_URL = os.getenv("API_URL", "http://backend:8000")
 
 st.sidebar.title("🐾 Menü")
 menu = st.sidebar.radio("Seçiniz:", ["🎮 Modeli Test Et", "📢 İlan Ver (Kayıp/Bulundu)", "🔍 İlanlarda Ara"])
