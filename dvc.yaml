@@ -1,0 +1,26 @@
+stages:
+  train:
+    cmd: python train.py
+    deps:
+      - data/train
+      - train.py
+      - params.yaml
+    params:
+      - train.epochs
+      - train.batch_size
+      - train.alpha
+    outs:
+      - models/experimental_model.weights.h5
+    metrics:
+      - metrics.json:
+          cache: false
+
+  evaluate:
+    cmd: python evaluate.py
+    deps:
+      - models/experimental_model.weights.h5 
+      - evaluate.py
+      - data/train
+    metrics:
+      - eval_metrics.json:
+          cache: false
