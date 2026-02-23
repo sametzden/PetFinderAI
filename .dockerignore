@@ -1,0 +1,28 @@
+# Git dosyaları
+.git
+.gitignore
+
+# Veri Klasörleri (ASLA imaja girmemeli)
+data/
+raw_data/
+processed_data/
+minio_data/
+# Model Çıktıları (Bunlar da sonradan oluşur veya indirilir)
+models/
+outputs/
+
+
+mlflow_data/
+# Python Sanal Ortamı ve Önbellekler
+venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints
+.env
+
+# Docker ile ilgili dosyalar
+docker-compose.yml
+Dockerfile*
+
+# DVC önbelleği
+.dvc/cache

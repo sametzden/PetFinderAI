@@ -1,1 +1,19 @@
-/experimental_model.weights.h5
+# Güvenlik 
+.env
+
+# Sanal Ortam ve Python Çöpleri
+venv/
+__pycache__/
+*.pyc
+
+# Veritabanı ve Loglar
+qdrant_storage/
+mlflow_data/
+
+# Büyük Model Dosyaları 
+models/*.h5
+models/*.keras
+app/backend/yolov8n.pt
+
+# İşletim Sistemi Dosyaları
+.DS_Store

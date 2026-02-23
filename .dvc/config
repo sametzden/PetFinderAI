@@ -1,7 +1,5 @@
 [core]
-    remote = myminio
-['remote "myminio"']
-    url = s3://dvc-storage
-    endpointurl = http://localhost:9000
-    access_key_id = admin_samet
-    secret_access_key = Samet147
+    remote = myremote
+['remote "myremote"']
+    url = s3://pet-retrieval-storage-samet/data
+    region = eu-north-1
