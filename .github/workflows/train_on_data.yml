@@ -3,8 +3,8 @@ name: Model Eğitimi (Veri Değiştiğinde)
 on:
   push:
     paths:
-      - 'data.dvc'  # SADECE veri takip dosyası değişirse çalışır!
-      - 'dvc.yaml'  # Veya pipeline değişirse çalışır.
+      - 'data/train.dvc'  # SADECE veri takip dosyası değişirse çalışır!
+      - 'dvc.yaml'        # Veya pipeline değişirse çalışır.
   
   # Manuel tetikleme butonu ekler (İstediğin zaman elle başlatmak için)
   workflow_dispatch: 
@@ -20,18 +20,15 @@ jobs:
 
       - name: Python Bağımlılıklarını Kur
         run: |
-          pip install -r requirements.txt
+          pip install -r requirements-train.txt
 
-      - name: MinIO Erişim Ayarları (GitHub Secrets'tan alacak)
+      - name: AWS S3 Erişim Ayarları (GitHub Secrets'tan alacak)
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          MLFLOW_S3_ENDPOINT_URL: ${{ secrets.MLFLOW_S3_ENDPOINT_URL }}
         run: |
-          # MinIO'ya erişim yapılandırması (DVC için)
           dvc remote modify --local myremote access_key_id $AWS_ACCESS_KEY_ID
           dvc remote modify --local myremote secret_access_key $AWS_SECRET_ACCESS_KEY
-          dvc remote modify --local myremote endpointurl $MLFLOW_S3_ENDPOINT_URL
 
       - name: Veriyi Çek (DVC Pull)
         run: dvc pull

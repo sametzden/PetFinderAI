@@ -4,8 +4,8 @@ services:
   # 1. BACKEND SERVİSİ
   backend:
     build:
-      context: ./app/backend  
-      dockerfile: Dockerfile  
+      context: ./app/backend
+      dockerfile: Dockerfile
     container_name: pet_backend
     ports:
       - "${BACKEND_PORT:-8000}:8000"
@@ -19,15 +19,12 @@ services:
       - PYTHONUNBUFFERED=1
     networks:
       - pet_network
-    depends_on:
-      qdrant:
-        condition: service_healthy
 
   # 2. FRONTEND SERVİSİ
   frontend:
     build:
-      context: ./app/frontend 
-      dockerfile: Dockerfile  
+      context: ./app/frontend
+      dockerfile: Dockerfile
     container_name: pet_frontend
     ports:
       - "${FRONTEND_PORT:-8501}:8501"
@@ -42,26 +39,6 @@ services:
     networks:
       - pet_network
 
-  # ... QDRANT ve NETWORK ayarları aynı kalacak ...
-  qdrant:
-    image: qdrant/qdrant:latest
-    container_name: pet_qdrant
-    ports:
-      - "${QDRANT_PORT:-6333}:6333"
-    volumes:
-      - qdrant_data:/qdrant/storage
-    networks:
-      - pet_network
-    healthcheck:
-      test: ["CMD-SHELL", "bash -c 'cat < /dev/null > /dev/tcp/localhost/6333'"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 5s
-
 networks:
   pet_network:
     driver: bridge
-
-volumes:
-  qdrant_data:

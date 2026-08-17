@@ -9,10 +9,10 @@ import base64
 # Docker içinde "backend" ismiyle konuşuruz.
 API_URL = os.getenv("API_URL", "http://backend:8000")
 
-st.set_page_config(page_title="Pet Finder AI (AWS Edition)", page_icon="☁️", layout="wide")
+st.set_page_config(page_title="Pet Finder AI", page_icon="🐾", layout="wide")
 
-st.title("☁️ Pet Retrieval System (AWS S3 Powered)")
-st.markdown("Yapay zeka ile kayıp dostlarımızı bulalım. Veriler artık Amazon Bulutunda güvende!")
+st.title("🐾 Pet Retrieval System")
+st.markdown("Yapay zeka ile kayıp dostlarımızı bulalım.")
 
 # --- SEKMELER ---
 tab1, tab2 = st.tabs(["🔍 Arama Yap (Search)", "➕ İlan / Veri Ekle (Upload)"])
@@ -33,7 +33,7 @@ with tab1:
         st.image(image, caption="Aranan Resim", width=300)
         
         if st.button("🔍 Benzerlerini Bul", key="btn_search"):
-            with st.spinner("AWS S3 ve Qdrant taranıyor..."):
+            with st.spinner("Veritabanı taranıyor..."):
                 try:
                     # Backend'e Dosya Gönder
                     files = {"file": uploaded_file.getvalue()}
@@ -103,7 +103,7 @@ with tab2:
         city = st.text_input("Şehir") if upload_type == "ad" else None
         desc = st.text_area("Açıklama") if upload_type == "ad" else None
         
-        submitted = st.form_submit_button("☁️ AWS S3'e ve Veritabanına Kaydet")
+        submitted = st.form_submit_button("💾 Kaydet")
         
         if submitted:
             if uploaded_index:
@@ -125,7 +125,7 @@ with tab2:
                         
                         if response.status_code == 200:
                             st.balloons()
-                            st.success("✅ Başarıyla Kaydedildi! Resim AWS S3'te, Vektör Qdrant'ta.")
+                            st.success("✅ Başarıyla Kaydedildi!")
                         else:
                             st.error(f"Hata: {response.text}")
                     except Exception as e:

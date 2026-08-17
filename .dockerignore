@@ -2,27 +2,25 @@
 .git
 .gitignore
 
-# Veri Klasörleri (ASLA imaja girmemeli)
+# Eğitim verisi (ASLA imaja girmemeli — sadece models/*.h5 gerekli)
 data/
 raw_data/
 processed_data/
+
+# Runtime'da oluşan / dış servislere ait veriler
+qdrant_storage/
+qdrant_data/
 minio_data/
-# Model Çıktıları (Bunlar da sonradan oluşur veya indirilir)
-models/
-outputs/
-
-
 mlflow_data/
+app/backend/gallery/ads/*
+!app/backend/gallery/ads/.gitkeep
+
 # Python Sanal Ortamı ve Önbellekler
 venv/
 __pycache__/
 *.pyc
 .ipynb_checkpoints
 .env
-
-# Docker ile ilgili dosyalar
-docker-compose.yml
-Dockerfile*
 
 # DVC önbelleği
 .dvc/cache

@@ -3,9 +3,16 @@ __pycache__/
 *.pyc
 .env
 .DS_Store
+
+# Yerel/dış servis verileri (artık kullanılmıyor ama eski checkout'lar için)
 qdrant_storage/
 minio_data/
-qdrant_storage/
-minio_data/
-__pycache__/
-.env
+mlflow_data/
+
+# Embedded Qdrant (dosya tabanlı, konteyner içinde/lokal üretilir)
+qdrant_data/
+app/backend/qdrant_data/
+
+# Kullanıcı yüklemeleri (runtime'da oluşur, repo'da tutulmaz)
+app/backend/gallery/ads/*
+!app/backend/gallery/ads/.gitkeep

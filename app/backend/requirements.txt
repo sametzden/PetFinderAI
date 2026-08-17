@@ -10,7 +10,6 @@ python-multipart
 tensorflow
 numpy
 pillow
-boto3
 qdrant-client
 ultralytics
 opencv-python-headless

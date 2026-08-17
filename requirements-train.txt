@@ -1,0 +1,8 @@
+# DVC pipeline (train.py / evaluate.py) için bağımlılıklar.
+# Servis (app/backend, app/frontend) bağımlılıkları için ilgili klasörlerdeki
+# requirements.txt dosyalarına bakın.
+tensorflow
+pyyaml
+numpy
+tqdm
+dvc[s3]

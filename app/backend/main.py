@@ -2,33 +2,26 @@ import io
 import os
 import base64
 import uuid
+import glob
 import numpy as np
 import tensorflow as tf
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from PIL import Image
 from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 from tensorflow.keras import layers, Model, applications
-import boto3 # <--- MinIO gitti, Boto3 geldi
-from botocore.exceptions import NoCredentialsError
 from qdrant_client import QdrantClient, models
 from ultralytics import YOLO
 
-# --- AYARLAR (AWS S3 VE QDRANT) ---
+# --- AYARLAR (LOKAL DEPOLAMA VE QDRANT) ---
 MODEL_PATH = "models/final_breed_model.weights.h5"
 
-# AWS AYARLARI
-AWS_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY_ID")
-AWS_SECRET_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
-AWS_REGION = os.getenv("AWS_REGION", "eu-central-1")
-# Senin oluşturduğun ana kova ismini buraya yaz (veya env'den al)
-S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME", "pet-retrieval-storage-samet")
+# GÖRSEL DEPOLAMA (Yerel Diskte - S3 gerekmez)
+GALLERY_DIR = os.getenv("GALLERY_DIR", "gallery")
+FOLDER_TEST = "test"   # gallery/test  -> demo/test verisi
+FOLDER_ADS = "ads"     # gallery/ads   -> kullanıcı ilanları
 
-# S3 İÇİNDEKİ KLASÖRLER
-FOLDER_TEST = "gallery/"     # Eski 'pet-test' yerine
-FOLDER_ADS = "ads-images/"   # Eski 'pet-ads' yerine
-
-QDRANT_HOST = os.getenv("QDRANT_HOST", "qdrant")
-QDRANT_PORT = int(os.getenv("QDRANT_PORT", 6333))
+# QDRANT (Embedded / dosya tabanlı - ayrı bir sunucu gerekmez)
+QDRANT_PATH = os.getenv("QDRANT_PATH", "qdrant_data")
 COLLECTION_NAME = os.getenv("QDRANT_COLLECTION", "pet_vectors")
 VECTOR_SIZE = 128
 NUM_CLASSES = 37
@@ -38,7 +31,6 @@ app = FastAPI()
 # --- GLOBAL DEĞİŞKENLER ---
 model = None
 yolo_model = None
-s3_client = None # <--- MinIO client yerine S3 client
 qdrant_client = None
 
 # Sınıf İsimleri (Aynı)
@@ -89,35 +81,69 @@ def check_yolo(pil_img):
             if cls_id in [15, 16] and conf > 0.4: is_animal = True
     return is_animal, detected_label, max_conf
 
+def gallery_path(folder: str, filename: str) -> str:
+    return os.path.join(GALLERY_DIR, folder, filename)
+
+def seed_gallery_if_empty():
+    """İlk açılışta gallery/test klasöründeki örnek görselleri Qdrant'a indeksler."""
+    count = qdrant_client.count(collection_name=COLLECTION_NAME, exact=True).count
+    if count > 0:
+        print(f"ℹ️ Qdrant zaten dolu ({count} vektör), seed atlanıyor.")
+        return
+
+    test_dir = os.path.join(GALLERY_DIR, FOLDER_TEST)
+    image_paths = sorted(glob.glob(os.path.join(test_dir, "*.jpg"))) + \
+                  sorted(glob.glob(os.path.join(test_dir, "*.jpeg"))) + \
+                  sorted(glob.glob(os.path.join(test_dir, "*.png")))
+
+    if not image_paths:
+        print(f"⚠️ Seed edilecek görsel bulunamadı: {test_dir}")
+        return
+
+    points = []
+    for path in image_paths:
+        with open(path, "rb") as f:
+            content = f.read()
+        _, img_array = process_image_bytes(content)
+        embedding, _ = model.predict(img_array, verbose=0)
+        points.append(models.PointStruct(
+            id=str(uuid.uuid4()),
+            vector=embedding[0].tolist(),
+            payload={
+                "filename": os.path.basename(path),
+                "folder": FOLDER_TEST,
+                "type": "test",
+            }
+        ))
+
+    qdrant_client.upsert(collection_name=COLLECTION_NAME, wait=True, points=points)
+    print(f"✅ {len(points)} demo görsel Qdrant'a indekslendi.")
+
 # --- STARTUP ---
 @app.on_event("startup")
 async def startup_event():
-    global model, yolo_model, s3_client, qdrant_client
-    
+    global model, yolo_model, qdrant_client
+
+    # Klasörleri hazırla
+    os.makedirs(gallery_path(FOLDER_TEST, ""), exist_ok=True)
+    os.makedirs(gallery_path(FOLDER_ADS, ""), exist_ok=True)
+
     # Modelleri Yükle
     try:
         model = build_model(); model.load_weights(MODEL_PATH); print("✅ Ana Model yüklendi!")
         yolo_model = YOLO("yolov8n.pt"); print("✅ Bekçi Model (YOLO) yüklendi!")
     except Exception as e: print(f"❌ Model Hatası: {e}")
 
-    # AWS S3 Bağlantısı
+    # Qdrant (embedded / dosya tabanlı - sunucu gerekmez)
     try:
-        s3_client = boto3.client(
-            's3',
-            aws_access_key_id=AWS_ACCESS_KEY,
-            aws_secret_access_key=AWS_SECRET_KEY,
-            region_name=AWS_REGION
-        )
-        print("✅ AWS S3 Bağlantısı Başarılı!")
-    except Exception as e:
-        print(f"❌ AWS S3 Hatası: {e}")
-
-    # Qdrant
-    try:
-        qdrant_client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
+        qdrant_client = QdrantClient(path=QDRANT_PATH)
         if not qdrant_client.collection_exists(COLLECTION_NAME):
             qdrant_client.create_collection(COLLECTION_NAME, vectors_config=models.VectorParams(size=VECTOR_SIZE, distance=models.Distance.EUCLID))
-    except: pass
+        if model is not None:
+            seed_gallery_if_empty()
+        print("✅ Qdrant (embedded) hazır!")
+    except Exception as e:
+        print(f"❌ Qdrant Hatası: {e}")
 
 # --- ENDPOINTS ---
 @app.post("/predict")
@@ -128,12 +154,12 @@ async def predict(
     # 1. Dosyayı Oku
     content = await file.read()
     pil_img, img_array = process_image_bytes(content)
-    
+
     # 2. Bekçi Kontrolü
     is_animal, detected_label, conf = check_yolo(pil_img)
     if not is_animal:
         return {"error": True, "debug_info": f"Tespit: {detected_label}", "prediction": "Bilinmiyor", "similar_pets": []}
-    
+
     # 3. Model Tahmini
     embedding, class_probs = model.predict(img_array, verbose=0)
     pred_idx = int(np.argmax(class_probs[0]))
@@ -143,11 +169,8 @@ async def predict(
     similar_pets = []
     if qdrant_client:
         try:
-            search_filter = None
-            if mode == "real":
-                search_filter = models.Filter(must=[models.FieldCondition(key="type", match=models.MatchValue(value="ad"))])
-            else:
-                search_filter = models.Filter(must=[models.FieldCondition(key="type", match=models.MatchValue(value="test"))])
+            target_folder = FOLDER_ADS if mode == "real" else FOLDER_TEST
+            search_filter = models.Filter(must=[models.FieldCondition(key="type", match=models.MatchValue(value="ad" if mode == "real" else "test"))])
 
             search_response = qdrant_client.query_points(
                 collection_name=COLLECTION_NAME,
@@ -158,34 +181,26 @@ async def predict(
 
             for result in search_response.points:
                 payload = result.payload
-                # ÖNEMLİ: S3'teki tam yol "s3_key" olarak saklanmalı.
-                # Eğer eski veri varsa uyum için filename kullanılır.
-                s3_key = payload.get("s3_key")
-                
-                # Eğer yeni sistemle kaydedilmemişse (eski veriyse) manuel oluşturmayı dene
-                if not s3_key:
-                    filename = payload.get("filename")
-                    bucket_type = payload.get("bucket") # Eski sistemdeki bucket adı
-                    folder = FOLDER_ADS if bucket_type == "pet-ads" else FOLDER_TEST
-                    s3_key = f"{folder}{filename}"
+                filename = payload.get("filename")
+                folder = payload.get("folder", target_folder)
+                local_path = gallery_path(folder, filename)
 
                 score = result.score
                 sim_score = 1 / (1 + score) if score >= 0 else 0
-                
+
                 try:
-                    # AWS S3'ten Resmi Çek
-                    obj = s3_client.get_object(Bucket=S3_BUCKET_NAME, Key=s3_key)
-                    file_content = obj['Body'].read()
+                    with open(local_path, "rb") as f:
+                        file_content = f.read()
                     b64_img = base64.b64encode(file_content).decode('utf-8')
-                    
+
                     pet_data = {
-                        "filename": s3_key,
+                        "filename": filename,
                         "score": sim_score,
                         "image_base64": b64_img,
                         "status": payload.get("status", "Bilinmiyor"),
                         "city": payload.get("city", "-"),
                     }
-                    
+
                     if mode == "real":
                         pet_data.update({
                             "contact_info": payload.get("contact_info", "Belirtilmemiş"),
@@ -201,8 +216,8 @@ async def predict(
 
                     similar_pets.append(pet_data)
                 except Exception as e:
-                    print(f"S3 Okuma Hatası ({s3_key}): {e}")
-                    
+                    print(f"Görsel Okuma Hatası ({local_path}): {e}")
+
         except Exception as e: print(f"Arama Hatası: {e}")
 
     return {
@@ -235,30 +250,24 @@ async def upload_to_gallery(
         # Dosya Yolu Belirleme (Klasör Mantığı)
         folder = FOLDER_ADS if upload_type == "ad" else FOLDER_TEST
         unique_filename = f"{uuid.uuid4()}_{file.filename}"
-        s3_full_key = f"{folder}{unique_filename}" # Örn: gallery/uuid_kedi.jpg
-        
-        # AWS S3'e Yükleme
-        file_like = io.BytesIO(content)
-        s3_client.upload_fileobj(
-            file_like,
-            S3_BUCKET_NAME,
-            s3_full_key,
-            ExtraArgs={'ContentType': file.content_type or "image/jpeg"}
-        )
-        
+        local_path = gallery_path(folder, unique_filename)
+
+        # Yerel Diske Kaydet
+        with open(local_path, "wb") as f:
+            f.write(content)
+
         # Vektör Çıkarma
         preds = model.predict(img_array, verbose=0)
         embedding_vector = preds[0][0].tolist()
-        
+
         # Payload Hazırla
         payload_data = {
-            "s3_key": s3_full_key, # Artık dosyanın tam yolunu tutuyoruz
             "filename": unique_filename,
-            "bucket_name": S3_BUCKET_NAME,
+            "folder": folder,
             "type": upload_type,
             "timestamp": str(uuid.uuid1().time)
         }
-        
+
         if upload_type == "ad":
             payload_data.update({
                 "owner_name": owner_name,
@@ -272,7 +281,9 @@ async def upload_to_gallery(
             collection_name=COLLECTION_NAME, wait=True,
             points=[models.PointStruct(id=str(uuid.uuid4()), vector=embedding_vector, payload=payload_data)]
         )
-        return {"message": "S3'e Başarıyla Kaydedildi!"}
+        return {"message": "Kaydedildi!"}
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
