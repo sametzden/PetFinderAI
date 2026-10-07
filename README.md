@@ -100,25 +100,4 @@ dvc repro     # train + evaluate stage'lerini yeniden çalıştır
 dvc metrics show
 ```
 
-## 🚀 Dağıtım (Deploy)
 
-Uygulama, AWS S3 veya harici bir Qdrant sunucusuna ihtiyaç duymadan tek bir
-Docker konteynerinde çalışacak şekilde tasarlandı (bkz. root `Dockerfile`).
-Bu sayede AWS'ye bağımlı kalmadan istenildiğinde herhangi bir Docker
-barındırma ortamına (Hugging Face Spaces dahil) deploy edilebilir.
-
-`scripts/deploy_hf_space.sh` script'i gerekli dosyaları (`app/`,
-`models/*.h5`, `Dockerfile`, `supervisord.conf`) paketleyip bir Hugging
-Face Space'in git remote'una push edecek şekilde hazır bekliyor;
-şu an aktif olarak kullanılmıyor.
-
-## Bilinen Sınırlamalar
-
-- Hugging Face Spaces'in ücretsiz katmanında disk **kalıcı değildir** —
-  Space uykuya girip yeniden başladığında, kullanıcıların yüklediği
-  "gerçek ilanlar" ve bunlara ait Qdrant vektörleri silinir. Kalıcılık
-  gerekiyorsa Space'e "Persistent Storage" eklenmeli ya da harici bir
-  vektör DB (örn. Qdrant Cloud free tier) bağlanmalıdır.
-- Backend imajı hem TensorFlow hem PyTorch (YOLO için) içerdiğinden imaj
-  boyutu büyüktür; ücretsiz CPU Space'lerde ilk açılış birkaç dakika
-  sürebilir.
